@@ -1,0 +1,81 @@
+---
+- name: Install Postgres  # noqa: schema[playbook]
+  hosts: personal:work:selfhost
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "ans_pass"
+      prompt: "Enter Ansible sudo Password"
+      private: true
+    - name: "pgsql_user"
+      prompt: "Enter Postgres Username"
+      private: false
+    - name: "pgsql_pass"
+      prompt: "Enter Postgres User Passowrd"
+      private: true
+    - name: "pgsql_db"
+      prompt: "Enter Postgres DB Name"
+      private: false
+  vars:
+    ansible_become_password: "{{ ans_pass }}"
+  tasks:
+    - name: Install Postgres
+      become: true
+      ansible.builtin.package:
+        name:
+          - postgresql
+          - py3-psycopg2
+        state: present
+
+    - name: Start Service
+      become: true
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - name: Find PostgreSQL config directory
+      ansible.builtin.find:
+        paths: /etc
+        patterns: "postgresql*"
+        file_type: directory
+      register: pg_dir
+
+    - name: Create User
+      become: true
+      community.postgresql.postgresql_user:
+        name: "{{ pgsql_user }}"
+        password: "{{ pgsql_pass }}"
+        role_attr_flags: "SUPERUSER"
+
+    - name: Create DB
+      become: true
+      community.postgresql.postgresql_db:
+        name: "{{ pgsql_db }}"
+        owner: "{{ pgsql_user }}"
+
+    - name: Configure prosgresql.conf
+      become: true
+      ansible.builtin.lineinfile:
+        path: "{{ pg_dir.files[0].path }}/postgresql.conf"
+        regexp: '^#?\s*listen_addresses\s*='
+        line: "listen_addresses = '*'"
+
+    - name: Configure User Access
+      become: true
+      community.postgresql.postgresql_pg_hba:
+        dest: "{{ pg_dir.files[0].path }}/pg_hba.conf"
+        contype: host
+        users: "{{ pgsql_user }}"
+        source: "all"
+        databases: "{{ pgsql_db }}"
+        method: "scram-sha-256"
+        create: true
+
+    - name: Set Service
+      become: true
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
+        enabled: true

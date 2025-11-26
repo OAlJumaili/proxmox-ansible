@@ -1,0 +1,25 @@
+---
+- name: Install qbittorrent  # noqa: schema[playbook]
+  hosts: personal:work:selfhost
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "ans_pass"
+      prompt: "Enter Ansible sudo Password"
+      private: true
+  vars:
+    ansible_become_password: "{{ ans_pass }}"
+  tasks:
+    - name: Install Qbittorrent-nox  # noqa: schema[playbook]
+      become: true
+      ansible.builtin.package:
+        name: qbittorrent-nox
+        state: present
+
+    - name: Set Qbittorrent-nox Service
+      become: true
+      ansible.builtin.service:
+        name: qbittorrent-nox
+        state: started
+        enabled: true

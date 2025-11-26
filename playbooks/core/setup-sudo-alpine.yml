@@ -1,0 +1,26 @@
+- name: Setup Sudo For Ansible  # noqa: schema[playbook]
+  hosts: personal:work:selfhost
+  gather_facts: false
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "prox_pass"
+      prompt: "Enter Proxmox sudo Password"
+      private: true
+  vars:
+    ansible_become_password: "{{ prox_pass }}"
+  tasks:
+    - name: Setup Sudo  # noqa: no-changed-when
+      delegate_to: prox
+      become: true
+      ansible.builtin.shell: |
+        pct exec {{ inventory_hostname }} -- bash -c "
+          apk update
+          apk upgrade
+          apk add shadow sudo nano sed
+          addgroup sudo
+          usermod -aG sudo ansible
+          sed -i 's/^#\s*\(%sudo\s\+ALL=(ALL:ALL)\s\+ALL\)/\1/' /etc/sudoers
+        "
+        pct reboot {{ inventory_hostname }}

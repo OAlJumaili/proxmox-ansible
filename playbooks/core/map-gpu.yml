@@ -1,0 +1,65 @@
+---
+- name: Add User Mapping To Ct Config  # noqa: schema[playbook]
+  hosts: gpu
+  gather_facts: true
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "prox_pass"
+      prompt: "Enter Proxmox sudo Password"
+      private: true
+  vars:
+    ansible_become_password: "{{ prox_pass }}"
+  tasks:
+    - name: Add user mapping to ct config
+      delegate_to: prox
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/pve/lxc/{{ inventory_hostname }}.conf
+        line: "{{ item }}"
+        regexp: "^{{ item | regex_escape }}$"
+      loop:
+        - "lxc.cgroup2.devices.allow: c 195:* rwm"
+        - "lxc.cgroup2.devices.allow: c 243:* rwm"
+        - "lxc.mount.entry: /dev/dri/renderD128 dev/dri/renderD128 none bind,optional,create=file"
+        - "lxc.mount.entry: /dev/nvidia0 dev/nvidia0 none bind,optional,create=file"
+        - "lxc.mount.entry: /dev/nvidiactl dev/nvidiactl none bind,optional,create=file"
+        - "lxc.mount.entry: /dev/nvidia-uvm dev/nvidia-uvm none bind,optional,create=file"
+        - "lxc.mount.entry: /dev/nvidia-uvm-tools dev/nvidia-uvm-tools none bind,optional,create=file"
+
+    - name: Restart Container To Apply Changes  # noqa: no-changed-when
+      become: true
+      delegate_to: prox
+      ansible.builtin.shell: |
+        pct reboot {{ inventory_hostname }}
+
+- name: Map GPU Drivers  # noqa: schema[playbook]
+  hosts: gpu
+  gather_facts: true
+  become: true
+  become_method: sudo
+  become_user: ansible
+  vars_prompt:
+    - name: "ans_pass"
+      prompt: "Enter Ansible sudo Password"
+      private: true
+  vars:
+    ansible_become_password: "{{ ans_pass }}"
+  tasks:
+    - name: Add software-properties-common  # noqa: no-changed-when
+      ansible.builtin.package:
+        name: software-properties-common
+        state: present
+
+    - name: Add Non-Free Drivers Repo  # noqa: no-changed-when
+      ansible.builtin.apt_repository:
+        repo: "{{ item }}"
+      loop:
+        - "universe"
+        - "multiverse"
+
+    - name: Install Nvidia Proprietary Drivers  # noqa: no-changed-when
+      ansible.builtin.package:
+        name: "nvidia-driver{{ nvidia_driver_version }}"
+        state: present

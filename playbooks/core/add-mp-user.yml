@@ -1,0 +1,69 @@
+---
+- name: Add User Mapping To Ct Config  # noqa: schema[playbook]
+  hosts: personal:work:selfhost
+  gather_facts: false
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "prox_pass"
+      prompt: "Enter Proxmox sudo Password"
+      private: true
+  vars:
+    ansible_become_password: "{{ prox_pass }}"
+  tasks:
+    - name: Add user mapping to ct config
+      delegate_to: prox
+      ansible.builtin.lineinfile:
+        path: /etc/pve/lxc/{{ inventory_hostname }}.conf
+        line: "{{ item }}"
+        regexp: "^{{ item | regex_escape }}$"
+      loop:
+        - "lxc.idmap: u 0 100000 {{ mp_user_id }}"
+        - "lxc.idmap: g 0 100000 {{ mp_user_id }}"
+        - "lxc.idmap: u {{ mp_user_id }} {{ mp_user_id }} 1"
+        - "lxc.idmap: g {{ mp_user_id }} {{ mp_user_id }} 1"
+        - "lxc.idmap: u {{ mp_user_id + 1 }} {{ 100000 + mp_user_id + 1 }} {{ 65536 - mp_user_id - 1 }}"
+        - "lxc.idmap: g {{ mp_user_id + 1 }} {{ 100000 + mp_user_id + 1 }} {{ 65536 - mp_user_id - 1 }}"
+
+    - name: Restart Container To Apply Changes  # noqa: no-changed-when
+      delegate_to: prox
+      ansible.builtin.shell: |
+        pct reboot {{ inventory_hostname }}
+
+- name: Create Mount Point User  # noqa: schema[playbook]
+  hosts: personal:work:selfhost
+  gather_facts: true
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "ans_pass"
+      prompt: "Enter Ansible sudo Password"
+      private: true
+  vars:
+    ansible_become_password: "{{ ans_pass }}"
+  tasks:
+    - name: Install Shadow Utils
+      become: true
+      ansible.builtin.package:
+        name: shadow
+        state: present
+      when: ansible_facts['os_family'] == "Alpine"
+
+    - name: Create Mount Point Group
+      become: true
+      ansible.builtin.group:
+        name: "{{ mp_user_name }}"
+        gid: "{{ mp_user_id }}"
+        state: present
+
+    - name: Create Mount Point User
+      become: true
+      ansible.builtin.user:
+        name: "{{ mp_user_name }}"
+        uid: "{{ mp_user_id }}"
+        group: "{{ mp_user_name }}"
+        create_home: true
+        shell: /bin/bash
+        state: present

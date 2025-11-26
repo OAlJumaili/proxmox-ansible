@@ -1,0 +1,65 @@
+---
+- name: Install Redis  # noqa: schema[playbook]
+  hosts: personal:work:selfhost
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "ans_pass"
+      prompt: "Enter Ansible Password"
+      private: true
+    - name: "redis_password"
+      prompt: "Enter Redis Password"
+      private: true
+  vars:
+    ansible_become_password: "{{ ans_pass }}"
+  tasks:
+    - name: Install Redis
+      ansible.builtin.package:
+        name:
+          - redis
+          - bash
+        state: present
+
+    - name: Set Config File  # noqa: no-relative-paths
+      ansible.builtin.template:
+        src: ../../templates/redis.conf.j2
+        dest: "/etc/redis/redis.conf"
+        owner: "redis"
+        group: "redis"
+        mode: "0644"
+      when: ansible_facts['os_family'] != "Alpine"
+
+    - name: Set Config File  # noqa: no-relative-paths
+      ansible.builtin.template:
+        src: ../../templates/redis.conf.j2
+        dest: "/etc/redis.conf"
+        owner: "redis"
+        group: "redis"
+        mode: "0644"
+      when: ansible_facts['os_family'] == "Alpine"
+
+    - name: Prepare Redis Directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: "redis"
+        group: "redis"
+        mode: "0750"
+        state: directory
+      loop:
+        - /var/lib/redis
+        - /var/log/redis
+
+    - name: Prepare Redis Run Directory
+      ansible.builtin.file:
+        path: "/var/run/redis"
+        owner: "redis"
+        group: "redis"
+        mode: "0755"
+        state: directory
+
+    - name: Set Service
+      ansible.builtin.service:
+        name: redis
+        state: started
+        enabled: true

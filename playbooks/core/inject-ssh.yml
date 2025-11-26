@@ -1,0 +1,42 @@
+---
+- name: Inject SSH
+  hosts: all
+  gather_facts: false
+  vars_prompt:
+    - name: "prox_pass"
+      prompt: "Enter Proxmox sudo Password"
+      private: true
+  vars:
+    ansible_become_password: "{{ prox_pass }}"
+  tasks:
+    - name: Fetch SSH Key
+      delegate_to: localhost
+      ansible.builtin.set_fact:
+        ssh_key: "{{ lookup('file', '/home/oaljumaili/.ssh/id_proxmox.pub') }}"
+
+    - name: Trust Container Host Key
+      delegate_to: localhost
+      ansible.builtin.shell: |
+        ssh-keyscan -H {{ hostvars[inventory_hostname]['ansible_host'] }} >> ~/.ssh/known_hosts
+      changed_when: true
+
+    - name: Inject SSH Key  # noqa: no-changed-when
+      delegate_to: prox
+      become: true
+      become_method: sudo  # noqa: schema[playbook]
+      become_user: root
+      ansible.builtin.shell: |
+        pct exec {{ inventory_hostname }} -- bash -c "
+          mkdir -p /home/ansible/.ssh &&
+          mkdir -p /home/ansible/.ansible/tmp &&
+          echo '{{ ssh_key }}' > /home/ansible/.ssh/authorized_keys &&
+          chown -R ansible:ansible /home/ansible &&
+          chmod -R 700 /home/ansible &&
+          chmod 600 /home/ansible/.ssh/authorized_keys &&
+          (apt-get install -y sed 2>/dev/null || apk add sed --no-cache || true) &&
+          sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config &&
+          (systemctl restart sshd 2>/dev/null || service ssh restart || service sshd restart || true)
+          chown root:root /usr/bin/sudo
+          chmod 4755 /usr/bin/sudo
+        "
+        pct reboot {{ inventory_hostname }}

@@ -1,0 +1,49 @@
+---
+- name: Install Samba And Configure Mount Point As An SMB Share  # noqa: schema[playbook]
+  hosts: personal:work:selfhost
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "ans_pass"
+      prompt: "Enter Ansible sudo Password"
+      private: true
+    - name: "mp-path"
+      prompt: "Enter Mount Point Path"
+      private: false
+    - name: "mp-name"
+      prompt: "Enter SMB Share Name"
+      private: false
+  vars:
+    ansible_become_password: "{{ ans_pass }}"
+  tasks:
+    - name: Install Samba
+      become: true
+      ansible.builtin.package:
+        name: samba
+        state: present
+
+    - name: Configure Samba Share
+      become: true
+      ansible.builtin.blockinfile:
+        path: /etc/samba/smb.conf
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - SAMBA SHARE"
+        block: |
+          [{{ mp_name }}]
+          path = {{ mp_path }}
+          force user = {{ mp_user_name }}
+          force group = {{ mp_user_name }}
+          create mask = 0664
+          force create mode = 0664
+          directory mask = 0775
+          force directory mode = 0775
+          public = yes
+          read only = no
+          browseable = yes
+
+    - name: Set Service
+      become: true
+      ansible.builtin.service:
+        name: smbd
+        state: started
+        enabled: true

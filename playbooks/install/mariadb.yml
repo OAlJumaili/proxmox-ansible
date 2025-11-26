@@ -1,0 +1,94 @@
+---
+- name: Install MariaDB  # noqa: schema[playbook]
+  hosts: personal:work:selfhost
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "ans_pass"
+      prompt: "Enter Ansible sudo Password"
+      private: true
+    - name: "mariadb_user"
+      prompt: "Enter MariaDB Username"
+      private: false
+    - name: "mariadb_pass"
+      prompt: "Enter MariaDB User Passowrd"
+      private: true
+    - name: "mariadb_db"
+      prompt: "Enter MariaDB DB Name"
+      private: false
+  vars:
+    ansible_become_password: "{{ ans_pass }}"
+  tasks:
+    - name: Install MariaDB
+      become: true
+      ansible.builtin.package:
+        name:
+          - mariadb
+          - mariadb-client
+          - mariadb-openrc
+          - py3-pymysql
+        state: present
+
+    - name: Initialize MariaDB
+      become: true
+      ansible.builtin.command: /etc/init.d/mariadb setup
+      args:
+        creates: /var/lib/mysql/mysql
+
+    - name: Start Service
+      become: true
+      ansible.builtin.service:
+        name: mariadb
+        state: started
+        enabled: true
+
+    - name: Create DB
+      become: true
+      community.mysql.mysql_db:
+        name: "{{ mariadb_db }}"
+        state: present
+        login_unix_socket: "/run/mysqld/mysqld.sock"
+
+    - name: Create User
+      become: true
+      community.mysql.mysql_user:
+        name: "{{ mariadb_user }}"
+        password: "{{ mariadb_pass }}"
+        priv: '*.*:ALL'
+        state: present
+        login_unix_socket: "/run/mysqld/mysqld.sock"
+
+    - name: Adjust Listen Address
+      community.general.ini_file:
+        path: "/etc/my.cnf.d/mariadb-server.cnf"
+        section: "mysqld"
+        option: "bind-address"
+        value: "0.0.0.0"
+        mode: "0600"
+        exclusive: true
+
+    - name: Adjust Port
+      community.general.ini_file:
+        path: "/etc/my.cnf.d/mariadb-server.cnf"
+        section: "mysqld"
+        option: "port"
+        value: "3306"
+        mode: "0600"
+        exclusive: true
+
+    - name: Remove "skip-networking"
+      community.general.ini_file:
+        path: "/etc/my.cnf.d/mariadb-server.cnf"
+        section: "mysqld"
+        option: "skip-networking"
+        state: absent
+        mode: "0600"
+        exclusive: true
+
+    - name: Set Service
+      become: true
+      ansible.builtin.service:
+        name: mariadb
+        state: restarted
+        enabled: true

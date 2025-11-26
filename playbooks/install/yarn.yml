@@ -1,0 +1,17 @@
+---
+- name: Install Yarn  # noqa: schema[playbook]
+  hosts: personal:work:selfhost
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "ans_pass"
+      prompt: "Enter Ansible Password"
+      private: true
+  vars:
+    ansible_become_password: "{{ ans_pass }}"
+  tasks:
+    - name: Install Yarn
+      ansible.builtin.package:
+        name: yarn
+        state: present
