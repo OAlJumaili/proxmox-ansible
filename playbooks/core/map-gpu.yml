@@ -39,7 +39,7 @@
   gather_facts: true
   become: true
   become_method: sudo
-  become_user: ansible
+  become_user: root
   vars_prompt:
     - name: "ans_pass"
       prompt: "Enter Ansible sudo Password"
