@@ -56,6 +56,7 @@
         name: "{{ mariadb_user }}"
         password: "{{ mariadb_pass }}"
         priv: '*.*:ALL'
+        host: "0.0.0.0"
         state: present
         login_unix_socket: "/run/mysqld/mysqld.sock"
 
