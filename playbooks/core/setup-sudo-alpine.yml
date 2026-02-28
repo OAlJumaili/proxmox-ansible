@@ -8,11 +8,15 @@
     - name: "prox_pass"
       prompt: "Enter Proxmox sudo Password"
       private: true
+
+    - name: "prox_node"
+      prompt: "Enter Proxmox Node Name"
+      private: false
   vars:
     ansible_become_password: "{{ prox_pass }}"
   tasks:
     - name: Setup Sudo  # noqa: no-changed-when
-      delegate_to: prox
+      delegate_to: "{{ prox_node }}"
       become: true
       ansible.builtin.shell: |
         pct exec {{ inventory_hostname }} -- bash -c "

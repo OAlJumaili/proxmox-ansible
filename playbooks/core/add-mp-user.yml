@@ -9,11 +9,15 @@
     - name: "prox_pass"
       prompt: "Enter Proxmox sudo Password"
       private: true
+
+    - name: "prox_node"
+      prompt: "Enter Proxmox Node Name"
+      private: false
   vars:
     ansible_become_password: "{{ prox_pass }}"
   tasks:
     - name: Add user mapping to ct config
-      delegate_to: prox
+      delegate_to: "{{ prox_node }}"
       ansible.builtin.lineinfile:
         path: /etc/pve/lxc/{{ inventory_hostname }}.conf
         line: "{{ item }}"
@@ -27,7 +31,7 @@
         - "lxc.idmap: g {{ mp_user_id + 1 }} {{ 100000 + mp_user_id + 1 }} {{ 65536 - mp_user_id - 1 }}"
 
     - name: Restart Container To Apply Changes  # noqa: no-changed-when
-      delegate_to: prox
+      delegate_to: "{{ prox_node }}"
       ansible.builtin.shell: |
         pct reboot {{ inventory_hostname }}
 
