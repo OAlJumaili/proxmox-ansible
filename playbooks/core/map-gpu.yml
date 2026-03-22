@@ -1,7 +1,7 @@
 ---
 - name: Add User Mapping To Ct Config  # noqa: schema[playbook]
   hosts: gpu
-  gather_facts: true
+  gather_facts: false
   become: true
   become_method: sudo
   become_user: root
@@ -34,7 +34,7 @@
 
     - name: Restart Container To Apply Changes  # noqa: no-changed-when
       become: true
-      delegate_to: p"{{ prox_node }}"x
+      delegate_to: "{{ prox_node }}"
       ansible.builtin.shell: |
         pct reboot {{ inventory_hostname }}
 
@@ -51,6 +51,11 @@
   vars:
     ansible_become_password: "{{ ans_pass }}"
   tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 0
+
     - name: Add software-properties-common  # noqa: no-changed-when
       ansible.builtin.package:
         name: software-properties-common
@@ -58,7 +63,7 @@
 
     - name: Add Non-Free Drivers Repo  # noqa: no-changed-when
       ansible.builtin.apt_repository:
-        repo: "{{ item }}"
+        repo: "deb http://archive.ubuntu.com/ubuntu {{ ansible_distribution_release }} {{ item }}"
       loop:
         - "universe"
         - "multiverse"
