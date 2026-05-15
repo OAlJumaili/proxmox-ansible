@@ -26,9 +26,9 @@
 
     - name: Inject SSH Key  # noqa: no-changed-when
       delegate_to: "{{ prox_node }}"
-      become: true
-      become_method: sudo  # noqa: schema[playbook]
-      become_user: root
+      vars:
+        ansible_user: root
+        ansible_password: "{{ prox_pass }}"
       ansible.builtin.shell: |
         pct exec {{ inventory_hostname }} -- bash -c "
           mkdir -p /home/ansible/.ssh &&
