@@ -1,0 +1,24 @@
+---
+- name: Upgrade Packages  # noqa: schema[playbook]
+  hosts: personal:work:selfhost
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "ans_pass"
+      prompt: "Enter Ansible sudo Password"
+      private: true
+  vars:
+    ansible_become_password: "{{ ans_pass }}"
+  tasks:
+    - name: Update cache + full upgrade (Debian/Ubuntu)
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: full
+      when: ansible_os_family == "Debian"
+
+    - name: Update + upgrade (Alpine)
+      community.general.apk:
+        update_cache: true
+        upgrade: true
+      when: ansible_os_family == "Alpine"
